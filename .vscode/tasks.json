@@ -1,0 +1,76 @@
+{
+    "tasks": [
+        // Library
+        {
+            "type": "shell",
+            "label": "Library Build",
+            "command": "make",
+            "args": [
+                "--makefile=Makefile.library.mk"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Build shared library for macOS"
+        },
+        // Debug
+        {
+            "type": "shell",
+            "label": "Debug Build",
+            "command": "make",
+            "args": [
+                "--makefile=Makefile.debug.mk"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "build",
+            "detail": "Build executable to debug shared library"
+        },
+        // Demo
+        {
+            "type": "shell",
+            "label": "Demo Build",
+            "command": "make",
+            "args": [
+                "--makefile=Makefile.demo.mk"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "build",
+            "detail": "Build demo executable to demo shared library and debug demo source"
+        },
+        // Tests
+        {
+            "type": "shell",
+            "label": "Tests Build",
+            "command": "make",
+            "args": [
+                "--makefile=Makefile.tests.mk"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": "build",
+            "detail": "Build unit tests"
+        },
+    ],
+    "version": "2.0.0"
+}

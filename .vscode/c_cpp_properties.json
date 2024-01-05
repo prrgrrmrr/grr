@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "macOS",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/tests",
+                "${workspaceFolder}/build/include",
+                "${workspaceFolder}/demo"
+            ],
+            "defines": [],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "cStandard": "c99",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-clang-arm64",
+            "configurationProvider": "ms-vscode.makefile-tools",
+            "compilerPath": "/usr/bin/clang"
+        }
+    ],
+    "version": 4
+}

@@ -1,0 +1,44 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "[macOS] Debug Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/debug/maind",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "lldb"
+        },
+        {
+            "name": "[macOS] Demo Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/demo/main",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "lldb"
+        },
+        {
+            "name": "[macOS] Tests Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/maint",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "lldb"
+        }
+    ]
+}
