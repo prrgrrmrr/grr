@@ -1,6 +1,8 @@
 src/debug
 tests/maint
 demo/main
+assets
 build
 *.dSYM
 *.dylib
+*.spv
