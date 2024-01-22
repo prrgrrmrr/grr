@@ -635,7 +635,7 @@ void Grr_startGameLoop() {
     if (!windowInfo->suspended) {
       Grr_drawFrame();
     } else {
-      GRR_LOG_DEBUG("Suspended\n");
+      GRR_LOG_DEBUG("Window suspended\n");
     }
   }
 #endif
@@ -654,7 +654,7 @@ void Grr_freeWindow() {
 CAMetalLayer *Grr_metalLayer() {
   CALayer *layer = [[windowInfo->nativeWindow contentView] layer];
   if (![layer isKindOfClass:[CAMetalLayer class]]) {
-    GRR_LOG_CRITICAL("macOS Window's content view does not have Metal layer\n");
+    GRR_LOG_CRITICAL("macOS window's content view does not have Metal layer\n");
     return nil;
   }
   CAMetalLayer *metalLayer = (CAMetalLayer *)layer;

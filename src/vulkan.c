@@ -277,7 +277,7 @@ Grr_bool _Grr_selectPhysicalDevice() {
   Grr_u32 deviceCount;
   vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
   if (deviceCount == 0) {
-    GRR_LOG_CRITICAL("No physical devices available\n");
+    GRR_LOG_CRITICAL("No physical device available\n");
     return false;
   }
   VkPhysicalDevice *physicalDevices =
@@ -539,7 +539,7 @@ void _Grr_swapchainResizeHandler(void *sender, const GrrEventData data) {
 }
 
 void _Grr_destroySwapchain() {
-  GRR_LOG_INFO("Free swap chain\n");
+  GRR_LOG_INFO("Free swapchain\n");
   vkDestroySwapchainKHR(device, swapchain, NULL);
   if (swapchainImages != NULL)
     free(swapchainImages);
@@ -686,7 +686,7 @@ VkImageView _Grr_createImageView(VkImage image, VkFormat format,
 }
 
 void _Grr_destroyImageViews() {
-  GRR_LOG_INFO("Free swap chain image views\n");
+  GRR_LOG_INFO("Free swapchain image views\n");
   Grr_u32 viewCount = imageCount;
   for (Grr_u32 i = 0; i < viewCount; i++)
     vkDestroyImageView(device, imageViews[i], NULL);
@@ -1100,8 +1100,7 @@ Grr_bool _Grr_createFramebuffers(Grr_bool recreate) {
   swapchainFramebuffers =
       (VkFramebuffer *)malloc(sizeof(VkFramebuffer) * imageCount);
   if (swapchainFramebuffers == NULL) {
-    GRR_LOG_CRITICAL(
-        "Failed to allocate memory for swap chain frame buffers\n");
+    GRR_LOG_CRITICAL("Failed to allocate memory for swapchain framebuffers\n");
     return false;
   }
   for (size_t i = 0; i < imageCount; i++) {
@@ -1188,7 +1187,7 @@ Grr_bool _Grr_createImage(Grr_u32 width, Grr_u32 height, VkFormat format,
   imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
   imageInfo.flags = 0; // Optional
   if (vkCreateImage(device, &imageInfo, NULL, image) != VK_SUCCESS) {
-    GRR_LOG_CRITICAL("glTF: failed to create image\n");
+    GRR_LOG_CRITICAL("Failed to create image\n");
     return false;
   }
   VkMemoryRequirements memRequirements;
@@ -1381,7 +1380,7 @@ Grr_bool _Grr_recreateSwapchain() {
   _Grr_destroyImageViews();
   _Grr_destroySwapchain();
 
-  GRR_LOG_INFO("Recreate swap chain\n");
+  GRR_LOG_INFO("Recreate swapchain\n");
   if (!_Grr_createSwapchain(true) || !_Grr_createImageViews(true) ||
       !_Grr_createDepthResources() || !_Grr_createFramebuffers(true)) {
     return false;
@@ -1408,12 +1407,12 @@ void Grr_drawFrame() {
       VK_NULL_HANDLE, &imageIndex);
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     if (false == _Grr_recreateSwapchain()) {
-      GRR_LOG_CRITICAL("Failed to recreate swap chain\n");
+      GRR_LOG_CRITICAL("Failed to recreate swapchain\n");
       exit(EXIT_FAILURE);
     }
     return;
   } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    GRR_LOG_CRITICAL("Failed to acquire swap chain image\n");
+    GRR_LOG_CRITICAL("Failed to acquire swapchain image\n");
     exit(EXIT_FAILURE);
   }
 
@@ -1464,11 +1463,11 @@ void Grr_drawFrame() {
       recreateSwapChain) {
     recreateSwapChain = false;
     if (false == _Grr_recreateSwapchain()) {
-      GRR_LOG_CRITICAL("Failed to recreate swap chain\n");
+      GRR_LOG_CRITICAL("Failed to recreate swapchain\n");
       exit(EXIT_FAILURE);
     }
   } else if (result != VK_SUCCESS) {
-    GRR_LOG_CRITICAL("Failed to present swap chain image\n");
+    GRR_LOG_CRITICAL("Failed to present swapchain image\n");
     exit(EXIT_FAILURE);
   }
 
@@ -1651,7 +1650,7 @@ Grr_bool _Grr_createTextureImage() {
   pixelData = Grr_loadPNG("./assets/coat_of_arms_of_morocco.png", &nBytes,
                           &width, &height);
   if (pixelData == NULL) {
-    GRR_LOG_CRITICAL("glTF: failed to load PNG texture image (%s)\n",
+    GRR_LOG_CRITICAL("Failed to load PNG texture image (%s)\n",
                      "./assets/coat_of_arms_of_morocco.png");
     return false;
   }
@@ -1847,7 +1846,6 @@ void _Grr_destroyUniformBuffers() {
 
 Grr_bool _Grr_createUniformBuffers() {
   VkDeviceSize bufferSize = sizeof(GrrUniformBufferObject);
-  GRR_LOG_DEBUG("Buffer size %lu\n", bufferSize);
 
   uniformBuffers = (VkBuffer *)malloc(sizeof(VkBuffer) * MAX_FRAMES_IN_FLIGHT);
   uniformBuffersMemory =

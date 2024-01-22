@@ -173,7 +173,7 @@ Grr_byte *Grr_loadPNG(const Grr_string path, Grr_u32 *nReadBytes, Grr_u32 *w,
         pngOk = false;
         break;
       }
-      GRR_LOG_DEBUG("png width (%u) height (%u)\n", width, height);
+      GRR_LOG_DEBUG("PNG width (%u) height (%u)\n", width, height);
       bitDepth = bytes[i];
       colorType = bytes[i + 1];
 
@@ -232,13 +232,11 @@ Grr_byte *Grr_loadPNG(const Grr_string path, Grr_u32 *nReadBytes, Grr_u32 *w,
     if (!CHUNK_IS_IEND()) {
       GRR_LOG_ERROR("PNG: last chunk is not IEND\n");
     } else {
-      // Decompress deflate stream:
-      GRR_LOG_DEBUG("Compressed length (%d bytes)\n", compressedSize);
+      // Decompress deflate stream
+      GRR_LOG_DEBUG("DEFLATE: compressed length (%d bytes)\n", compressedSize);
       size_t decodedSize;
       decoded = Grr_inflate(bytes, compressedSize, &decodedSize);
-      // TODO: delete
-      Grr_writeBytesToFile("./assets/inflate_bytes", decoded, decodedSize);
-      GRR_LOG_DEBUG("Decompressed length (%u bytes)\n", decodedSize);
+      GRR_LOG_DEBUG("DEFLATE: decompressed length (%u bytes)\n", decodedSize);
 
       // Defilter
       Grr_u32 bytesPerPixel = 4;
@@ -290,8 +288,7 @@ Grr_byte *Grr_loadPNG(const Grr_string path, Grr_u32 *nReadBytes, Grr_u32 *w,
             break;
 
           default:
-            GRR_LOG_CRITICAL("PNG: unknown filtering method (%u)\n",
-                             filterType);
+            GRR_LOG_ERROR("PNG: unknown filtering method (%u)\n", filterType);
             exit(EXIT_FAILURE);
             break;
           }
@@ -421,35 +418,34 @@ Grr_bool _Grr_isHexDigit(Grr_u32 codePoint) {
 
 // Update current string
 
-char previousName[256];   // Previous JSON string
-char name[256];           // Current JSON string
-Grr_u16 lastPushed;       // Last pushed on stack
-Grr_u16 previouslyPushed; // Previous to last
-Grr_u16 nameLength;
+char previousJSONString[256]; // Previous JSON string
+char currentJSONString[256];  // Current JSON string
+Grr_u16 lastPushed;           // Last pushed on stack
+Grr_u16 previouslyPushed;     // Previous to last
+Grr_u16 currentJSONStringLength;
 void _Grr_beingString() {
-  if (nameLength > 0) {
-    strncpy(previousName, name, nameLength);
-    previousName[nameLength] = '\0';
+  if (currentJSONStringLength > 0) {
+    strncpy(previousJSONString, currentJSONString, currentJSONStringLength);
+    previousJSONString[currentJSONStringLength] = '\0';
   }
-  name[0] = '\0';
-  nameLength = 0;
+  currentJSONString[0] = '\0';
+  currentJSONStringLength = 0;
 }
 
 void _Grr_updateJSONString(Grr_u32 codePoint) {
   if (codePoint <= 0x7F) {
-    name[nameLength++] = codePoint;
+    currentJSONString[currentJSONStringLength++] = codePoint;
   } else {
-    name[nameLength++] = '\\';
-    name[nameLength++] = 'u';
-    sprintf(name + nameLength, "%4X", codePoint);
-    nameLength += 4;
+    currentJSONString[currentJSONStringLength++] = '\\';
+    currentJSONString[currentJSONStringLength++] = 'u';
+    sprintf(currentJSONString + currentJSONStringLength, "%4X", codePoint);
+    currentJSONStringLength += 4;
   }
 }
 
 void _Grr_endJSONString(GrrList *stack, GrrList *objStack,
                         Grr_bool isHashValue) {
-  name[nameLength++] = '\0';
-  GRR_LOG_CRITICAL("Parsed string '%s'\n", name);
+  currentJSONString[currentJSONStringLength++] = '\0';
 
   GrrType type;
   Grr_u16 topJSONType = Grr_listGetAtIndex(stack, stack->count - 1, NULL)->u16;
@@ -457,9 +453,9 @@ void _Grr_endJSONString(GrrList *stack, GrrList *objStack,
       Grr_listGetAtIndex(objStack, objStack->count - 1, &type);
 
   GrrHashMapValue stringValue;
-  stringValue.string = (Grr_string)malloc(nameLength + 1);
-  strncpy(stringValue.string, name, nameLength);
-  stringValue.string[nameLength] = '\0';
+  stringValue.string = (Grr_string)malloc(currentJSONStringLength + 1);
+  strncpy(stringValue.string, currentJSONString, currentJSONStringLength);
+  stringValue.string[currentJSONStringLength] = '\0';
 
   if (topJSONType == GRR_JSON_ARRAY) {
     assert(type == LIST);
@@ -468,7 +464,8 @@ void _Grr_endJSONString(GrrList *stack, GrrList *objStack,
   } else if (topJSONType == GRR_JSON_OBJECT) {
     assert(type == HASH_MAP);
     if (isHashValue) {
-      Grr_hashMapPut(topJSONValue->map, previousName, stringValue, STRING);
+      Grr_hashMapPut(topJSONValue->map, previousJSONString, stringValue,
+                     STRING);
     }
   }
 }
@@ -482,9 +479,8 @@ GrrHashMap *_Grr_beginJSONObject(GrrList *objStack) {
   GrrHashMapValue value;
   value.map = obj;
   Grr_listPushBack(objStack, value, HASH_MAP);
-  GRR_LOG_INFO("Push new hashmap to stack\n");
+  GRR_LOG_DEBUG("Push new hashmap (@ %p) to stack\n", obj);
   assert(Grr_listGetAtIndex(objStack, objStack->count - 1, NULL)->map == obj);
-  GRR_LOG_INFO("HashMap @ %p\n", obj);
 
   return obj;
 }
@@ -500,7 +496,7 @@ GrrList *_Grr_beginJSONList(GrrList *objStack) {
   GrrHashMapValue value;
   value.list = list;
   Grr_listPushBack(objStack, value, LIST);
-  GRR_LOG_INFO("Push new list to stack\n");
+  GRR_LOG_DEBUG("Push new list (@ %p) to stack\n", list);
 
   return list;
 }
@@ -542,15 +538,12 @@ void _Grr_endJSONNumber(GrrList *stack, GrrList *objStack) {
 
   GrrHashMapValue numberValue;
   GrrType numberType;
-  // GRR_LOG_CRITICAL("NUMBER STRING %s\n", number);
   if (numberIsFloat) {
     numberValue.f64 = atof(number);
     numberType = FLOAT64;
-    // GRR_LOG_CRITICAL("NUMBER %.1f\n", numberValue.f64);
   } else {
     numberValue.i64 = atoll(number);
     numberType = INT64;
-    // GRR_LOG_CRITICAL("NUMBER %lld\n", numberValue.i64);
   }
 
   if (topJSONType == GRR_JSON_ARRAY) {
@@ -558,7 +551,8 @@ void _Grr_endJSONNumber(GrrList *stack, GrrList *objStack) {
     Grr_listPushBack(topJSONValue->list, numberValue, numberType);
   } else if (topJSONType == GRR_JSON_OBJECT) {
     assert(type == HASH_MAP);
-    Grr_hashMapPut(topJSONValue->map, name, numberValue, numberType);
+    Grr_hashMapPut(topJSONValue->map, currentJSONString, numberValue,
+                   numberType);
   }
 }
 
@@ -584,7 +578,8 @@ void _Grr_endJSONLiteral(GrrList *stack, GrrList *objStack, Grr_byte value) {
     Grr_listPushBack(topJSONValue->list, literalValue, literalType);
   } else if (topJSONType == GRR_JSON_OBJECT) {
     assert(type == HASH_MAP);
-    Grr_hashMapPut(topJSONValue->map, name, literalValue, literalType);
+    Grr_hashMapPut(topJSONValue->map, currentJSONString, literalValue,
+                   literalType);
   }
 }
 
@@ -593,10 +588,10 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
   size_t nBytes;
   Grr_byte *bytes = Grr_readBytesFromFile(path, &nBytes);
   if (bytes == NULL || nBytes == 0) {
-    GRR_LOG_ERROR("No bytes read from file\n");
+    GRR_LOG_ERROR("glTF: No bytes read from file\n");
     return false;
   }
-  GRR_LOG_DEBUG("Read %d bytes from file\n", nBytes);
+  GRR_LOG_DEBUG("glTF: read %d bytes from file\n", nBytes);
 
   Grr_u32 i = 0;              // Current byte index
   Grr_byte byte;              // Current byte
@@ -614,19 +609,13 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
   }
 
   // Stack of current JSON parse
-  // Grr_u16 stack[100]; // TODO: make dynamic ?
-  GrrList stack;    // JSON types
-  GrrList objStack; // JSON data
-  GrrHashMap *json = NULL;
-  // Grr_u32 stackSize = 0;
+  GrrList stack;           // JSON types
+  GrrList objStack;        // JSON data
+  GrrHashMap *json = NULL; // JSON result
 
   Grr_initList(&stack);
   Grr_initList(&objStack);
 
-// #define STACK_IS_EMPTY() (stackSize == 0)
-// #define STACK_TOP_IS(what) (stack[stackSize - 1] == what)
-// #define STACK_POP() stackSize--
-// #define STACK_PUSH(what) stack[stackSize++] = what
 #define STACK_IS_EMPTY() (stack.count == 0)
 #define STACK_TOP_IS(what)                                                     \
   (Grr_listGetAtIndex(&stack, stack.count - 1, NULL)->u16 == what)
@@ -645,7 +634,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
 
     // The octet values C0, C1, F5 to FF never appear
     if (byte == 0xC0 || byte == 0xC1 || (byte >= 0xF5 && byte <= 0xFF)) {
-      GRR_LOG_ERROR("Not UTF-8: octet values C0, C1, F5 to FF should never "
+      GRR_LOG_ERROR("UTF-8: octet values C0, C1, F5 to FF should never "
                     "appear (byte position %d)\n",
                     i);
       utf8Ok = false;
@@ -661,8 +650,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
     // 2-byte character
     else if ((byte & 0xE0) == 0xC0) {
       if ((bytes[i + 1] & 0xC0) != 0x80) {
-        GRR_LOG_CRITICAL("Not UTF-8: second byte in 2-byte character does not "
-                         "look like 10xxxxxx");
+        GRR_LOG_ERROR("UTF-8: second byte in 2-byte character does not "
+                      "look like 10xxxxxx");
         utf8Ok = false;
         break;
       }
@@ -670,7 +659,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           ((Grr_u32)(byte & 0x1F) << 6) | (Grr_u32)(bytes[i + 1] & 0x3F);
       if (codePoint < (Grr_u32)0x0080 || codePoint > (Grr_u32)0x07FF) {
         GRR_LOG_ERROR(
-            "Not UTF-8: code point (%u) is out of 2-byte character range\n",
+            "UTF-8: code point (%u) is out of 2-byte character range\n",
             codePoint);
         utf8Ok = false;
         break;
@@ -678,18 +667,19 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
       i += 2;
       fullyASCII = false;
     }
+
     // 3-byte character
     else if ((byte & 0xF0) == 0xE0) {
       if ((bytes[i + 1] & 0xC0) != 0x80) {
-        GRR_LOG_CRITICAL("Not UTF-8: second byte in 3-byte character does not "
-                         "look like 10xxxxxx");
+        GRR_LOG_ERROR("UTF-8: second byte in 3-byte character does not "
+                      "look like 10xxxxxx");
         utf8Ok = false;
         break;
       }
 
       if ((bytes[i + 2] & 0xC0) != 0x80) {
-        GRR_LOG_CRITICAL("Not UTF-8: third byte in 3-byte character does not "
-                         "look like 10xxxxxx");
+        GRR_LOG_ERROR("UTF-8: third byte in 3-byte character does not "
+                      "look like 10xxxxxx");
         utf8Ok = false;
         break;
       }
@@ -700,7 +690,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
 
       if (codePoint < 0x0800 || codePoint > (Grr_u32)0xFFFF) {
         GRR_LOG_ERROR(
-            "Not UTF-8: code point (%u) is out of 3-byte character range\n",
+            "UTF-8: code point (%u) is out of 3-byte character range\n",
             codePoint);
         utf8Ok = false;
         break;
@@ -709,25 +699,26 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
       i += 3;
       fullyASCII = false;
     }
+
     // 4-byte character
     else if ((byte & 0xF8) == 0xF0) {
       if ((bytes[i + 1] & 0xC0) != 0x80) {
-        GRR_LOG_CRITICAL("Not UTF-8: second byte in 4-byte character does not "
-                         "look like 10xxxxxx");
+        GRR_LOG_ERROR("UTF-8: second byte in 4-byte character does not "
+                      "look like 10xxxxxx");
         utf8Ok = false;
         break;
       }
 
       if ((bytes[i + 2] & 0xC0) != 0x80) {
-        GRR_LOG_CRITICAL("Not UTF-8: third byte in 4-byte character does not "
-                         "look like 10xxxxxx");
+        GRR_LOG_ERROR("UTF-8: third byte in 4-byte character does not "
+                      "look like 10xxxxxx");
         utf8Ok = false;
         break;
       }
 
       if ((bytes[i + 3] & 0xC0) != 0x80) {
-        GRR_LOG_CRITICAL("Not UTF-8: fourth byte in 4-byte character does not "
-                         "look like 10xxxxxx");
+        GRR_LOG_ERROR("UTF-8: fourth byte in 4-byte character does not "
+                      "look like 10xxxxxx");
         utf8Ok = false;
         break;
       }
@@ -739,7 +730,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
 
       if (codePoint < (Grr_u32)0x00010000 || codePoint > (Grr_u32)0x0010FFFF) {
         GRR_LOG_ERROR(
-            "Not UTF-8: code point (%u) is out of 4-byte character range\n",
+            "UTF-8: code point (%u) is out of 4-byte character range\n",
             codePoint);
         utf8Ok = false;
         break;
@@ -749,7 +740,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
       fullyASCII = false;
     } else {
       GRR_LOG_ERROR(
-          "Not UTF-8: byte (%x) does not encode start of UTF-8 byte sequence\n",
+          "UTF-8: byte (%x) does not encode start of UTF-8 byte sequence\n",
           byte);
       utf8Ok = false;
       fullyASCII = false;
@@ -758,7 +749,6 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
 
     // Process code point
     if (_Grr_isWhitespace(codePoint) == false) {
-      putc(codePoint, stdout);
       fflush(stdout);
 
       switch (codePoint) {
@@ -787,7 +777,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             assert(type == HASH_MAP);
             GrrHashMapValue objValue;
             objValue.map = _Grr_beginJSONObject(&objStack);
-            Grr_hashMapPut(value->map, name, objValue, HASH_MAP);
+            Grr_hashMapPut(value->map, currentJSONString, objValue, HASH_MAP);
           }
 
           STACK_PUSH(GRR_JSON_OBJECT);
@@ -815,7 +805,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           }
         } else if (!STACK_IS_EMPTY())
 
-        { // Inside string
+        {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -832,7 +823,6 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             _Grr_endJSONNumber(&stack, &objStack);
           }
           GRR_LOG_DEBUG("Begin JSON array\n");
-          // _Grr_beginJSONList(&objStack);
           if (STACK_TOP_IS(GRR_JSON_ARRAY)) {
             GrrType type;
             GrrHashMapValue *value =
@@ -848,7 +838,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             assert(type == HASH_MAP);
             GrrHashMapValue objValue;
             objValue.list = _Grr_beginJSONList(&objStack);
-            Grr_hashMapPut(value->map, name, objValue, LIST);
+            Grr_hashMapPut(value->map, currentJSONString, objValue, LIST);
           }
           STACK_PUSH(GRR_JSON_ARRAY);
         } else
@@ -1250,10 +1240,9 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
 #undef STACK_POP
 #undef STACK_PUSH
 
-  GRR_LOG_DEBUG("All bytes processed %d\n", i == nBytes);
-  GRR_LOG_DEBUG("UTF-8 ok %d\n", utf8Ok);
-  GRR_LOG_DEBUG("Fully ASCII %d\n", fullyASCII);
-  GRR_LOG_DEBUG("Last code point %d\n", codePoint);
+  GRR_LOG_DEBUG("All bytes processed? %d\n", i == nBytes);
+  GRR_LOG_DEBUG("UTF-8 ok? %d\n", utf8Ok);
+  GRR_LOG_DEBUG("Fully ASCII? %d\n", fullyASCII);
 
   Grr_freeList(&stack); // Free stack of JSON types
   free(bytes);

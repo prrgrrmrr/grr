@@ -38,7 +38,7 @@ Grr_bool Grr_writeBytesToFile(const Grr_string path, const Grr_byte *bytes,
 
   FILE *f = fopen(path, "wb");
   if (NULL == f) {
-    GRR_LOG_ERROR("Failed to open file to write (%s)\n", path);
+    GRR_LOG_ERROR("Failed to open file (%s) to write\n", path);
     return false;
   }
   size_t written = fwrite(bytes, 1, nBytes, f);
@@ -113,7 +113,7 @@ void _Grr_HuffmanTreeFromCodeLengths(GrrHuffmanTree *tree, Grr_u32 lengths[],
   Grr_u32 nextCode[20];
   nextCode[0] = 0;
   if (freqs[0] != 0) {
-    GRR_LOG_ERROR("Hummfman: code length 0 has non-zero frequency\n");
+    GRR_LOG_ERROR("Huffman: code length 0 has non-zero frequency\n");
     freqs[0] = 0;
   }
   for (Grr_u32 i = 1; i <= maxLength; i++) {
@@ -125,9 +125,6 @@ void _Grr_HuffmanTreeFromCodeLengths(GrrHuffmanTree *tree, Grr_u32 lengths[],
     if (lengths[i + lengthsOffset] > 0) {
       _Grr_HuffmanTreeAdd(tree, nextCode[lengths[i + lengthsOffset]],
                           lengths[i + lengthsOffset], alphabet[i]);
-      // GRR_LOG_DEBUG("INSERT code (%u) length (%u) alphabet (%u)\n",
-      //               nextCode[lengths[i + lengthsOffset]],
-      //               lengths[i + lengthsOffset], alphabet[i]);
       nextCode[lengths[i + lengthsOffset]] += 1;
     }
   }
@@ -161,9 +158,6 @@ Grr_u32 _Grr_HuffmanTreeWalk(GrrHuffmanTree *tree, Grr_byte *bytes,
   size_t currentBit = *pCurrentBit;
   do {
     NEXT_BITS(1, b)
-    // GRR_LOG_DEBUG("Next bit (%u)\n", b);
-    // GRR_LOG_INFO("Current byte (%u) Current bit (%u)\n", currentByte,
-    //              currentBit);
     if (b == 0)
       currentNode = tree->left[currentNode];
     else
@@ -212,11 +206,11 @@ Grr_byte *Grr_inflate(Grr_byte *bytes, size_t nBytes, size_t *outputSize) {
   currentBit = 0;
   finalBlock = false;
 
-  // Zlib header
+  // ZIP header header
   Grr_byte compressionMethod;
   NEXT_BITS(4, compressionMethod)
   if (compressionMethod != 8) {
-    GRR_LOG_ERROR("Zlib: unsupported compression method (%u)\n",
+    GRR_LOG_ERROR("ZIP header: unsupported compression method (%u)\n",
                   compressionMethod);
     return NULL;
   }
@@ -224,11 +218,12 @@ Grr_byte *Grr_inflate(Grr_byte *bytes, size_t nBytes, size_t *outputSize) {
   Grr_byte compressionInfo;
   NEXT_BITS(4, compressionInfo);
   if (compressionInfo > 7) {
-    GRR_LOG_ERROR("Zlib: compression info too long (%u)\n", compressionInfo);
+    GRR_LOG_ERROR("ZIP header: compression info too long (%u)\n",
+                  compressionInfo);
     return NULL;
   }
   Grr_u32 windowSize = (1 << (compressionInfo + 8));
-  GRR_LOG_DEBUG("DEFLATE window size (%u)\n", windowSize);
+  GRR_LOG_DEBUG("DEFLATE: window size (%u)\n", windowSize);
 
   currentByte = 2; // Skip to DEFLATE byte stream (ignoring byte 1 flags)
 
@@ -258,7 +253,7 @@ Grr_byte *Grr_inflate(Grr_byte *bytes, size_t nBytes, size_t *outputSize) {
       len = ((Grr_u16)bytes[currentByte + 1] << 8) | bytes[currentByte];
       nLen = ((Grr_u16)bytes[currentByte + 3] << 8) | bytes[currentByte + 2];
       if (len != (~nLen & 0xFFFF)) {
-        GRR_LOG_ERROR("DEFLATE block's NLEN is not equal to the one's "
+        GRR_LOG_ERROR("DEFLATE: block's NLEN is not equal to the one's "
                       "complement of LEN\n");
         decodedSize = 0;
         break;
@@ -270,7 +265,7 @@ Grr_byte *Grr_inflate(Grr_byte *bytes, size_t nBytes, size_t *outputSize) {
       currentByte += len;
     } else {
       if (blockType == 3) {
-        GRR_LOG_ERROR("DEFLATE block type 11 encountered\n");
+        GRR_LOG_ERROR("DEFLATE: block type 11 encountered\n");
         decodedSize = 0;
         break;
       }
@@ -467,7 +462,6 @@ Grr_byte *Grr_inflate(Grr_byte *bytes, size_t nBytes, size_t *outputSize) {
         // Decode value from input stream
         symbol = _Grr_HuffmanTreeWalk(&literalsAndLengthsTree, bytes,
                                       &currentByte, &currentBit);
-        // GRR_LOG_WARNING("Next byte (%u)\n", symbol);
         if (symbol < 256) {
           // Copy value (literal byte) to output stream
           decoded[decodedSize++] = symbol;
@@ -496,7 +490,7 @@ Grr_byte *Grr_inflate(Grr_byte *bytes, size_t nBytes, size_t *outputSize) {
   GRR_LOG_DEBUG("Adler-32 checksum (%u)\n", adler32);
 
   if (nBytes != currentByte + 1) {
-    GRR_LOG_ERROR("Zlib: wrong number of Adler-32 checksum bytes\n");
+    GRR_LOG_ERROR("ZIP header: wrong number of Adler-32 checksum bytes\n");
   }
 
 #undef STEP
@@ -621,29 +615,13 @@ Grr_u32 _Grr_hash(const Grr_string key) {
 
 void Grr_hashMapPut(GrrHashMap *map, const Grr_string key,
                     const GrrHashMapValue value, const GrrType type) {
-  GRR_LOG_WARNING("HashMap @ %p: put key/value pair with key (%s)\n", map, key);
-  switch (type) {
-  case INT64:
-    GRR_LOG_WARNING("Value: %lld\n", value.i64);
-    break;
 
-  case FLOAT64:
-    GRR_LOG_WARNING("Value: %.1f\n", value.f64);
-    break;
-
-  case STRING:
-    GRR_LOG_WARNING("Value: %s\n", value.string);
-    break;
-
-  default:
-    // TODO
-    break;
-  }
+  GRR_LOG_DEBUG("Hashmap @ %p: put key/value pair with key ('%s')", map, key);
 
   Grr_u32 h = _Grr_hash(key);
   for (Grr_u32 i = 0; i < HASH_MAP_MAX; i++) {
     if (map->entries[h].empty) {
-      // New
+      // New key
       map->entries[h].empty = false;
       size_t len = strlen(key);
       map->entries[h].key = (Grr_string)malloc(len + 1);
@@ -654,9 +632,9 @@ void Grr_hashMapPut(GrrHashMap *map, const Grr_string key,
       map->count += 1;
       return;
     } else if (0 == strcmp(map->entries[h].key, key)) {
-      // Exists
+      // Key exists
       GRR_LOG_WARNING(
-          "HashMap: entry with key ('%s') already exists. Updating value\n",
+          "Hashmap: entry with key ('%s') already exists. Updating value\n",
           key);
       size_t len = strlen(key);
       map->entries[h].key = (Grr_string)realloc(map->entries[h].key, len + 1);
