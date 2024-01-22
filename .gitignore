@@ -1,5 +1,6 @@
 src/debug
 tests/maint
+demo/main
 build
 *.dSYM
 *.dylib
