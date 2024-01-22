@@ -20,4 +20,4 @@ $(error $(OS) is not supported)
 endif
 
 all:
-	$(C) $(STD) -DGRR_$(PLATFORM) $(C_FLAGS) $(I_FLAGS) -lobjc $(FRAMEWORK_PATHS) $(FRAMEWORKS) -o $(TESTS)/maint $(shell find $(TESTS) -name "*.c") $(shell find $(SRC) -name "*.c" ! -name "*maind.c" -or -name "*.m") -ObjC 
+	$(C) $(STD) -DGRR_$(PLATFORM) -DGRR_DEBUG $(C_FLAGS) $(I_FLAGS) -lobjc $(FRAMEWORK_PATHS) $(FRAMEWORKS) -o $(TESTS)/maint $(shell find $(TESTS) -name "*.c") $(shell find $(SRC) -name "*.c" ! -name "*maind.c" -or -name "*.m") -ObjC 
