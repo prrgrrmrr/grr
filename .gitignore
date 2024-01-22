@@ -1,0 +1,5 @@
+src/debug
+tests/maint
+build
+*.dSYM
+*.dylib
