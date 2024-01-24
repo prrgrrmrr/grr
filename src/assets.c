@@ -583,7 +583,9 @@ void _Grr_endJSONLiteral(GrrList *stack, GrrList *objStack, Grr_byte value) {
   }
 }
 
-GrrHashMap *Grr_glTFLoad(const Grr_string path) {
+GrrModel *_Grr_modelFromJSON(const GrrHashMap *json) { return NULL; }
+
+GrrModel *Grr_glTFLoad(const Grr_string path) {
   // Load file as binary
   size_t nBytes;
   Grr_byte *bytes = Grr_readBytesFromFile(path, &nBytes);
@@ -748,9 +750,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
     }
 
     // Process code point
-    if (_Grr_isWhitespace(codePoint) == false) {
-      fflush(stdout);
-
+    if (false == _Grr_isWhitespace(codePoint)) {
       switch (codePoint) {
       case LEFT_BRACE:
         if (STACK_IS_EMPTY() || !STACK_TOP_IS(GRR_JSON_STRING)) {
@@ -781,9 +781,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           }
 
           STACK_PUSH(GRR_JSON_OBJECT);
-        } else
-
-        { // Inside string
+        } else {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         }
         break;
@@ -803,9 +802,7 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             GRR_LOG_ERROR("JSON is not valid: expected object\n"); // Error
             jsonOk = false;
           }
-        } else if (!STACK_IS_EMPTY())
-
-        {
+        } else if (!STACK_IS_EMPTY()) {
           // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
@@ -841,9 +838,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             Grr_hashMapPut(value->map, currentJSONString, objValue, LIST);
           }
           STACK_PUSH(GRR_JSON_ARRAY);
-        } else
-
-        { // Inside string
+        } else {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         }
         break;
@@ -863,9 +859,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             GRR_LOG_ERROR("JSON is not valid: expected array\n"); // Error
             jsonOk = false;
           }
-        } else if (!STACK_IS_EMPTY())
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY()) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -891,9 +886,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             Grr_bool isHashValue =
                 (lastPushed == GRR_JSON_STRING) && (previouslyPushed == COLON);
             _Grr_endJSONString(&stack, &objStack, isHashValue);
-          } else
-
-          { // Inside string
+          } else {
+            // Inside string
             _Grr_updateJSONString(codePoint);
           }
         } else {
@@ -911,9 +905,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           }
           STACK_PUSH(GRR_JSON_TRUE_LITERAL_T); // Begin true literal
           GRR_LOG_DEBUG("Begin JSON true literal\n");
-        } else if (!STACK_IS_EMPTY())
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY()) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -926,9 +919,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
         if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_TRUE_LITERAL_T)) {
           STACK_POP();
           STACK_PUSH(GRR_JSON_TRUE_LITERAL_R); // Update stack top
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -944,9 +936,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
         } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_NULL_LITERAL_N)) {
           STACK_POP();
           STACK_PUSH(GRR_JSON_NULL_LITERAL_U); // Update stack top
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR("JSON is not valid: expected true/null literal or "
@@ -964,9 +955,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           STACK_POP(); // End JSON false literal
           GRR_LOG_DEBUG("End JSON false literal\n");
           _Grr_endJSONLiteral(&stack, &objStack, 0);
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_NUMBER)) {
           // Inside number
@@ -982,9 +972,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
         if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_NUMBER)) {
           // Inside number
           _Grr_updateJSONNumber(codePoint);
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -1002,9 +991,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           }
           STACK_PUSH(GRR_JSON_FALSE_LITERAL_F); // Begin false literal
           GRR_LOG_DEBUG("Begin JSON false literal\n");
-        } else if (!STACK_IS_EMPTY())
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY()) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR("JSON is not valid: expected false literal, number or "
@@ -1017,9 +1005,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
         if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_FALSE_LITERAL_F)) {
           STACK_POP();
           STACK_PUSH(GRR_JSON_FALSE_LITERAL_A); // Update stack top
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -1039,9 +1026,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           STACK_POP(); // End JSON null literal
           GRR_LOG_DEBUG("End JSON null literal\n");
           _Grr_endJSONLiteral(&stack, &objStack, 2);
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR("JSON is not valid: expected false/null literal or "
@@ -1054,9 +1040,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
         if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_FALSE_LITERAL_L)) {
           STACK_POP();
           STACK_PUSH(GRR_JSON_FALSE_LITERAL_S); // Update stack top
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -1074,9 +1059,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
           }
           STACK_PUSH(GRR_JSON_NULL_LITERAL_N); // Begin null literal
           GRR_LOG_DEBUG("Begin JSON null literal\n");
-        } else if (!STACK_IS_EMPTY())
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY()) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -1104,9 +1088,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
               _Grr_updateJSONNumber(codePoint);
             }
           }
-        } else
-
-        { // Inside string
+        } else {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         }
         break;
@@ -1123,9 +1106,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             // Inside number
             _Grr_updateJSONNumber(codePoint);
           }
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -1144,9 +1126,8 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             // Inside number
             _Grr_updateJSONNumber(codePoint);
           }
-        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING))
-
-        { // Inside string
+        } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
           GRR_LOG_ERROR(
@@ -1220,10 +1201,9 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
             _Grr_updateJSONString(codePoint);
           }
         } else if (!STACK_IS_EMPTY() && STACK_TOP_IS(GRR_JSON_STRING)) {
+          // Inside string
+          _Grr_updateJSONString(codePoint);
 
-          { // Inside string
-            _Grr_updateJSONString(codePoint);
-          }
         } else {
           GRR_LOG_ERROR("JSON is not valid: expected number or string\n");
           utf8Ok = false;
@@ -1247,7 +1227,11 @@ GrrHashMap *Grr_glTFLoad(const Grr_string path) {
   Grr_freeList(&stack); // Free stack of JSON types
   free(bytes);
 
-  if (utf8Ok && jsonOk)
-    return json;
+  if (utf8Ok && jsonOk) {
+    // Use json hashmap to construct model
+    GrrModel *model = _Grr_modelFromJSON(json);
+    Grr_freeHashMap(json); // Frees JSON recursively
+    return model;
+  }
   return NULL;
 }

@@ -47,55 +47,129 @@ Grr_bool Grr_writeBytesToFile(const Grr_string path, const Grr_byte *bytes,
   return (written == nBytes);
 }
 
-#define MAX_TREE_NODES 5000 // TODO figure out max size
+// Huffman trees
+
 typedef struct GrrHuffmanTree {
-  Grr_u32 left[MAX_TREE_NODES];
-  Grr_u32 right[MAX_TREE_NODES];
-  Grr_u32 label[MAX_TREE_NODES]; // Binary label of edge pointing to node
-  Grr_u32 value[MAX_TREE_NODES]; // Alphabet value if leaf node
-  Grr_u32 count;                 // Keep count of nodes in tree
+  GrrList nodes; // Each node is a 64-bit unsigned int containing left, right,
+                 // label and value properties: not all used at the same time;
+                 // depends if node is leaf
+  // Grr_u32 count;
 } GrrHuffmanTree;
 
-Grr_u32 _Grr_HuffmanNewNode(GrrHuffmanTree *tree) {
-  if (tree->count >= MAX_TREE_NODES) {
-    GRR_LOG_CRITICAL("Huffman: exhausted max nodes (%d) available for tree\n",
-                     MAX_TREE_NODES);
-    exit(EXIT_FAILURE);
-  }
-  return tree->count++;
+Grr_u32 _Grr_HuffmanGetLeftChild(GrrHuffmanTree *tree, Grr_u32 node) {
+  GrrType type;
+  GrrHashMapValue *value = Grr_listGetAtIndex(&(tree->nodes), node, &type);
+  assert(type == UNSIGNED64);
+  if ((value->u64 & 2) == 2) // Leaf
+    return 0;                // No left child
+  return ((value->u64 & 0xFFFFFFFF) >>
+          2); // Bits (zero-based) 2 to 32 serve as left child node
 }
-#undef MAX_TREE_NODES
+
+void _Grr_HuffmanSetLeftChild(GrrHuffmanTree *tree, Grr_u32 node,
+                              Grr_u32 child) {
+  GrrType type;
+  GrrHashMapValue *value =
+      Grr_listGetAtIndex(&(tree->nodes), node,
+                         &type); // Returns pointer to value, value pointed to
+                                 // can be modified directly
+  assert(type == UNSIGNED64);
+  Grr_u32 label = value->u64 & 1;
+  value->u64 =
+      (value->u64 & ((Grr_u64)0xFFFFFFFF << 32)) | (child << 2) | label;
+}
+
+void _Grr_HuffmanSetRightChild(GrrHuffmanTree *tree, Grr_u32 node,
+                               Grr_u32 child) {
+  GrrType type;
+  GrrHashMapValue *value =
+      Grr_listGetAtIndex(&(tree->nodes), node,
+                         &type); // Returns pointer to value, value pointed to
+                                 // can be modified direclty
+  assert(type == UNSIGNED64);
+  value->u64 = (value->u64 & ((Grr_u64)0xFFFFFFFF)) | ((Grr_u64)child << 32);
+}
+
+Grr_u32 _Grr_HuffmanGetRightChild(GrrHuffmanTree *tree, Grr_u32 node) {
+  GrrHashMapValue *value = Grr_listGetAtIndex(&(tree->nodes), node, NULL);
+  if ((value->u64 & 2) == 2) // Leaf
+    return 0;                // No right child
+  return (value->u64 >> 32) &
+         0xFFFFFFFF; // Bits (zero-based) 32 to 63 serve as right child node
+}
+
+Grr_u32 _Grr_HuffmanNewNode(GrrHuffmanTree *tree) {
+  GrrHashMapValue value;
+  value.u64 = 0;
+  Grr_listPushBack(&(tree->nodes), value, UNSIGNED64);
+  return tree->nodes.count - 1;
+}
 
 void _Grr_HuffmanTreeInit(GrrHuffmanTree *tree) {
-  tree->count = 1;                            // Node 0 is root
-  memset(tree->left, 0, sizeof(tree->left));  // 0 means no left child
-  memset(tree->right, 0, sizeof(tree->left)); // 0 means no right child
+  Grr_initList(&(tree->nodes));
+  assert(0 == _Grr_HuffmanNewNode(tree)); // Node 0 is root
 }
 
 Grr_bool _Grr_HuffmanNodeIsLeaf(GrrHuffmanTree *tree, Grr_u32 node) {
-  return (!tree->left[node] && !tree->right[node]);
+  GrrHashMapValue *value = Grr_listGetAtIndex(&(tree->nodes), node, NULL);
+  return (value->u64 & 2) == 2;
+}
+
+void _Grr_HuffmanSetLabel(GrrHuffmanTree *tree, Grr_u32 node, Grr_u32 label) {
+  GrrHashMapValue *value =
+      Grr_listGetAtIndex(&(tree->nodes), node,
+                         NULL); // Returns pointer to value, value pointed to
+                                // can be modified direclty
+  if (label)
+    value->u64 |= label;
+  else if (value->u64 & 1)
+    value->u64 ^= 1;
+}
+
+void _Grr_HuffmanSetLeafValue(GrrHuffmanTree *tree, Grr_u32 node,
+                              Grr_u32 leafValue) {
+  GrrHashMapValue *value =
+      Grr_listGetAtIndex(&(tree->nodes), node,
+                         NULL); // Returns pointer to value, value pointed to
+                                // can be modified direclty
+  value->u64 =
+      (value->u64 | ((Grr_u64)0xFFFFFFFF << 32)) & ((Grr_u64)leafValue << 32);
+  value->u64 |= 2; // Flag leaf
+}
+
+Grr_u32 _Grr_HuffmanGetLeafValue(GrrHuffmanTree *tree, Grr_u32 node) {
+  GrrHashMapValue *value = Grr_listGetAtIndex(&(tree->nodes), node, NULL);
+  return ((value->u64 >> 32) & 0xFFFFFFFF);
+}
+
+Grr_u32 _Grr_HuffmanGetLabel(GrrHuffmanTree *tree, Grr_u32 node) {
+  GrrHashMapValue *value = Grr_listGetAtIndex(&(tree->nodes), node, NULL);
+  return (value->u64 & 1);
 }
 
 void _Grr_HuffmanTreeAdd(GrrHuffmanTree *tree, Grr_u32 code, Grr_u32 length,
                          Grr_u32 leafValue) {
   Grr_u32 currentNode = 0; // Root
+  Grr_u32 child;
   for (Grr_i32 i = length - 1; i >= 0; i--) {
     Grr_u32 bit = code & (1 << i);
     if (bit) {
-      // Right
-      if (!tree->right[currentNode])
-        tree->right[currentNode] = _Grr_HuffmanNewNode(tree);
-      tree->label[tree->right[currentNode]] = 1;
-      currentNode = tree->right[currentNode];
+      child = _Grr_HuffmanGetRightChild(tree, currentNode);
+      if (!child) {
+        child = _Grr_HuffmanNewNode(tree);
+        _Grr_HuffmanSetRightChild(tree, currentNode, child);
+      }
+      _Grr_HuffmanSetLabel(tree, child, 1);
     } else {
-      // Left
-      if (!tree->left[currentNode])
-        tree->left[currentNode] = _Grr_HuffmanNewNode(tree);
-      tree->label[tree->left[currentNode]] = 0;
-      currentNode = tree->left[currentNode];
+      child = _Grr_HuffmanGetLeftChild(tree, currentNode);
+      if (!child) {
+        child = _Grr_HuffmanNewNode(tree);
+        _Grr_HuffmanSetLeftChild(tree, currentNode, child);
+      }
     }
+    currentNode = child;
   }
-  tree->value[currentNode] = leafValue;
+  _Grr_HuffmanSetLeafValue(tree, currentNode, leafValue);
 }
 
 void _Grr_HuffmanTreeFromCodeLengths(GrrHuffmanTree *tree, Grr_u32 lengths[],
@@ -159,26 +233,29 @@ Grr_u32 _Grr_HuffmanTreeWalk(GrrHuffmanTree *tree, Grr_byte *bytes,
   do {
     NEXT_BITS(1, b)
     if (b == 0)
-      currentNode = tree->left[currentNode];
+      currentNode = _Grr_HuffmanGetLeftChild(tree, currentNode);
     else
-      currentNode = tree->right[currentNode];
+      currentNode = _Grr_HuffmanGetRightChild(tree, currentNode);
   } while (!_Grr_HuffmanNodeIsLeaf(tree, currentNode));
   *pCurrentByte = currentByte;
   *pCurrentBit = currentBit;
-  return tree->value[currentNode];
+  return _Grr_HuffmanGetLeafValue(tree, currentNode);
 }
 
 void _Grr_HuffmanTreeDebug(GrrHuffmanTree *tree, Grr_u32 node) {
   if (_Grr_HuffmanNodeIsLeaf(tree, node)) {
-    printf("Leaf (%u) ", tree->value[node]);
+    printf("Leaf (%u) ", _Grr_HuffmanGetLeafValue(tree, node));
   } else {
-    if (tree->left[node]) {
-      printf("<-(%u)- ", tree->label[tree->left[node]]);
-      _Grr_HuffmanTreeDebug(tree, tree->left[node]);
+    Grr_u32 child = _Grr_HuffmanGetLeftChild(tree, node);
+    if (child) {
+      printf("<-(%u)- ", _Grr_HuffmanGetLabel(tree, child));
+      _Grr_HuffmanTreeDebug(tree, child);
     }
-    if (tree->right[node]) {
-      printf("-(%u)-> ", tree->label[tree->right[node]]);
-      _Grr_HuffmanTreeDebug(tree, tree->right[node]);
+
+    child = _Grr_HuffmanGetLeftChild(tree, node);
+    if (child) {
+      printf("-(%u)-> ", _Grr_HuffmanGetLabel(tree, child));
+      _Grr_HuffmanTreeDebug(tree, child);
     }
   }
   fflush(stdout);
@@ -497,6 +574,10 @@ Grr_byte *Grr_inflate(Grr_byte *bytes, size_t nBytes, size_t *outputSize) {
 #undef NEXT_BIT
 #undef NEXT_BITS
 
+  Grr_freeList(&(distancesTree.nodes));
+  Grr_freeList(&(codeLengthTree.nodes));
+  Grr_freeList(&(literalsAndLengthsTree.nodes));
+
   *outputSize = decodedSize;
   return decoded;
 }
@@ -616,7 +697,7 @@ Grr_u32 _Grr_hash(const Grr_string key) {
 void Grr_hashMapPut(GrrHashMap *map, const Grr_string key,
                     const GrrHashMapValue value, const GrrType type) {
 
-  GRR_LOG_DEBUG("Hashmap @ %p: put key/value pair with key ('%s')", map, key);
+  GRR_LOG_DEBUG("Hashmap @ %p: put key/value pair with key ('%s')\n", map, key);
 
   Grr_u32 h = _Grr_hash(key);
   for (Grr_u32 i = 0; i < HASH_MAP_MAX; i++) {

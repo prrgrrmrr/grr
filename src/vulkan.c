@@ -63,7 +63,7 @@ VkImageView textureImageView;
 VkSampler textureSampler;
 
 // Model
-GrrModel model;
+GrrModel *model;
 
 const Grr_u32 MAX_FRAMES_IN_FLIGHT = 2;
 Grr_u32 currentFrame = 0;
@@ -1317,7 +1317,7 @@ Grr_bool _Grr_recordCommandBuffer(VkCommandBuffer commandBuffer,
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipelineLayout, 0, 1, &descriptorSets[currentFrame],
                           0, NULL);
-  vkCmdDrawIndexed(commandBuffer, model.indexCount, 1, 0, 0, 0);
+  vkCmdDrawIndexed(commandBuffer, model->indexCount, 1, 0, 0, 0);
 
   vkCmdEndRenderPass(commandBuffer);
 
@@ -1739,58 +1739,66 @@ Grr_bool _Grr_createTextureSampler() {
 
 Grr_bool _Grr_createVertexBuffer() {
   // TODO: temp
-  model.vertexCount = 4;
-  model.vertices = (GrrVertex *)malloc(sizeof(GrrVertex) * model.vertexCount);
-  model.vertices[0].position[0] = -0.5f;
-  model.vertices[0].position[1] = -0.5f;
-  model.vertices[0].position[2] = 0.5f;
-  model.vertices[0].color[0] = 1.0f;
-  model.vertices[0].color[1] = 0.0f;
-  model.vertices[0].color[2] = 0.0f;
-  model.vertices[0].color[3] = 0.0f;
-  model.vertices[0].textureCoordinates[0] = 0.0f;
-  model.vertices[0].textureCoordinates[1] = 0.0f;
+  // model->vertexCount = 4;
+  // model->vertices = (GrrVertex *)malloc(sizeof(GrrVertex) *
+  // model->vertexCount); model->vertices[0].position[0] = -0.5f;
+  // model->vertices[0].position[1] = -0.5f;
+  // model->vertices[0].position[2] = 0.5f;
+  // model->vertices[0].color[0] = 1.0f;
+  // model->vertices[0].color[1] = 0.0f;
+  // model->vertices[0].color[2] = 0.0f;
+  // model->vertices[0].color[3] = 0.0f;
+  // model->vertices[0].textureCoordinates[0] = 0.0f;
+  // model->vertices[0].textureCoordinates[1] = 0.0f;
 
-  model.vertices[1].position[0] = 0.5f;
-  model.vertices[1].position[1] = -0.5f;
-  model.vertices[1].position[2] = 0.5f;
-  model.vertices[1].color[0] = 0.0f;
-  model.vertices[1].color[1] = 1.0f;
-  model.vertices[1].color[2] = 0.0f;
-  model.vertices[1].color[3] = 0.0f;
-  model.vertices[1].textureCoordinates[0] = 1.0f;
-  model.vertices[1].textureCoordinates[1] = 0.0f;
+  // model->vertices[1].position[0] = 0.5f;
+  // model->vertices[1].position[1] = -0.5f;
+  // model->vertices[1].position[2] = 0.5f;
+  // model->vertices[1].color[0] = 0.0f;
+  // model->vertices[1].color[1] = 1.0f;
+  // model->vertices[1].color[2] = 0.0f;
+  // model->vertices[1].color[3] = 0.0f;
+  // model->vertices[1].textureCoordinates[0] = 1.0f;
+  // model->vertices[1].textureCoordinates[1] = 0.0f;
 
-  model.vertices[2].position[0] = 0.5f;
-  model.vertices[2].position[1] = 0.5f;
-  model.vertices[2].position[2] = 0.5f;
-  model.vertices[2].color[0] = 0.0f;
-  model.vertices[2].color[1] = 0.0f;
-  model.vertices[2].color[2] = 1.0f;
-  model.vertices[2].color[3] = 0.0f;
-  model.vertices[2].textureCoordinates[0] = 1.0f;
-  model.vertices[2].textureCoordinates[1] = 1.0f;
+  // model->vertices[2].position[0] = 0.5f;
+  // model->vertices[2].position[1] = 0.5f;
+  // model->vertices[2].position[2] = 0.5f;
+  // model->vertices[2].color[0] = 0.0f;
+  // model->vertices[2].color[1] = 0.0f;
+  // model->vertices[2].color[2] = 1.0f;
+  // model->vertices[2].color[3] = 0.0f;
+  // model->vertices[2].textureCoordinates[0] = 1.0f;
+  // model->vertices[2].textureCoordinates[1] = 1.0f;
 
-  model.vertices[3].position[0] = -0.5f;
-  model.vertices[3].position[1] = 0.5f;
-  model.vertices[3].position[2] = 0.5f;
-  model.vertices[3].color[0] = 1.0f;
-  model.vertices[3].color[1] = 1.0f;
-  model.vertices[3].color[2] = 1.0f;
-  model.vertices[3].color[3] = 0.0f;
-  model.vertices[3].textureCoordinates[0] = 0.0f;
-  model.vertices[3].textureCoordinates[1] = 1.0f;
+  // model->vertices[3].position[0] = -0.5f;
+  // model->vertices[3].position[1] = 0.5f;
+  // model->vertices[3].position[2] = 0.5f;
+  // model->vertices[3].color[0] = 1.0f;
+  // model->vertices[3].color[1] = 1.0f;
+  // model->vertices[3].color[2] = 1.0f;
+  // model->vertices[3].color[3] = 0.0f;
+  // model->vertices[3].textureCoordinates[0] = 0.0f;
+  // model->vertices[3].textureCoordinates[1] = 1.0f;
 
-  model.indexCount = 6;
-  model.indices = (Grr_u32 *)malloc(sizeof(Grr_u32) * model.indexCount);
-  model.indices[0] = 0;
-  model.indices[1] = 1;
-  model.indices[2] = 2;
-  model.indices[3] = 2;
-  model.indices[4] = 3;
-  model.indices[5] = 0;
+  // model->indexCount = 6;
+  // model->indices = (Grr_u32 *)malloc(sizeof(Grr_u32) * model->indexCount);
+  // model->indices[0] = 0;
+  // model->indices[1] = 1;
+  // model->indices[2] = 2;
+  // model->indices[3] = 2;
+  // model->indices[4] = 3;
+  // model->indices[5] = 0;
+  // Test loading models here
+  GrrModel *model = Grr_glTFLoad("../glTF-Sample-Models/2.0/DamagedHelmet/"
+                                 "glTF/DamagedHelmet.gltf");
+  if (NULL == model) {
+    GRR_LOG_CRITICAL("Failed to load glTF model\n");
+    exit(EXIT_FAILURE);
+  }
+  // Grr_writeJSONToFile(json, "output.json");
 
-  VkDeviceSize bufferSize = sizeof(GrrVertex) * model.vertexCount;
+  VkDeviceSize bufferSize = sizeof(GrrVertex) * model->vertexCount;
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   if (_Grr_createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1803,7 +1811,7 @@ Grr_bool _Grr_createVertexBuffer() {
 
   void *data;
   vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-  memcpy(data, model.vertices, (size_t)bufferSize);
+  memcpy(data, model->vertices, (size_t)bufferSize);
   vkUnmapMemory(device, stagingBufferMemory);
 
   if (_Grr_createBuffer(bufferSize,
@@ -1970,7 +1978,7 @@ Grr_bool _Grr_createDescriptorSets() {
 }
 
 Grr_bool _Grr_createIndexBuffer() {
-  VkDeviceSize bufferSize = sizeof(Grr_u32) * model.indexCount;
+  VkDeviceSize bufferSize = sizeof(Grr_u32) * model->indexCount;
 
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
@@ -1984,7 +1992,7 @@ Grr_bool _Grr_createIndexBuffer() {
 
   void *data;
   vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-  memcpy(data, model.indices, (size_t)bufferSize);
+  memcpy(data, model->indices, (size_t)bufferSize);
   vkUnmapMemory(device, stagingBufferMemory);
 
   if (_Grr_createBuffer(bufferSize,

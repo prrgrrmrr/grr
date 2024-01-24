@@ -86,7 +86,7 @@ typedef struct GrrModel {
 } GrrModel;
 
 // glTF
-GrrHashMap *Grr_glTFLoad(const Grr_string path);
+GrrModel *Grr_glTFLoad(const Grr_string path);
 
 // Images
 Grr_byte *Grr_loadPNG(const Grr_string path, Grr_u32 *nReadbytes, Grr_u32 *w,

@@ -4,6 +4,7 @@
 #include "logging.h"
 #include "string.h"
 #include "types.h"
+#include <assert.h>
 #include <stdlib.h>
 
 // Binary IO
