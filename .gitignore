@@ -6,3 +6,4 @@ build
 *.dSYM
 *.dylib
 *.spv
+*.DS_Store

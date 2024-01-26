@@ -107,4 +107,7 @@ void Grr_freeHashMap(GrrHashMap *map);
 // JSON debug
 void Grr_writeJSONToFile(GrrHashMap *json, const Grr_string path);
 
+// Directory and path utils
+Grr_string Grr_dirFromFilePath(Grr_string path);
+
 #endif

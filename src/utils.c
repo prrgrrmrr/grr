@@ -737,7 +737,8 @@ GrrHashMapValue *Grr_hashMapGet(GrrHashMap *map, const Grr_string key,
   Grr_u32 h = _Grr_hash(key);
   for (Grr_u32 i = 0; i < HASH_MAP_MAX; i++) {
     if (0 == strcmp(map->entries[h].key, key)) {
-      *type = map->entries[h].type;
+      if (type)
+        *type = map->entries[h].type;
       return &(map->entries[h].value);
     }
     h += 1;
@@ -890,4 +891,21 @@ void Grr_writeJSONToFile(GrrHashMap *json, const Grr_string path) {
   } else {
     GRR_LOG_ERROR("Failed to open file (%s) to write\n", path);
   }
+}
+
+Grr_string Grr_dirFromFilePath(Grr_string path) {
+  // TODO: perform checks on path (should be valid file)
+  Grr_i32 len = -1;
+  for (char *c = path; *c != '\0'; c++) {
+    if (*c == '/')
+      len = (c - path) + 1;
+  }
+
+  if (len != -1) {
+    char *dir = (char *)malloc(len + 1);
+    memcpy(dir, path, len);
+    dir[len] = '\0';
+    return dir;
+  }
+  return NULL;
 }
