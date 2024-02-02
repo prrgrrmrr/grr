@@ -736,7 +736,7 @@ GrrHashMapValue *Grr_hashMapGet(GrrHashMap *map, const Grr_string key,
                                 GrrType *type) {
   Grr_u32 h = _Grr_hash(key);
   for (Grr_u32 i = 0; i < HASH_MAP_MAX; i++) {
-    if (0 == strcmp(map->entries[h].key, key)) {
+    if (!map->entries[h].empty && (0 == strcmp(map->entries[h].key, key))) {
       if (type)
         *type = map->entries[h].type;
       return &(map->entries[h].value);
