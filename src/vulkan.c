@@ -63,7 +63,7 @@ VkImageView textureImageView;
 VkSampler textureSampler;
 
 // Model
-GrrModel *model;
+GrrModel model;
 
 const Grr_u32 MAX_FRAMES_IN_FLIGHT = 2;
 Grr_u32 currentFrame = 0;
@@ -840,21 +840,26 @@ Grr_bool _Grr_createGraphicsPipeline() {
       sizeof(dynamicStates) / sizeof(VkDynamicState);
   dynamicState.pDynamicStates = &dynamicStates[0];
 
-  // Vertex input
-  VkVertexInputBindingDescription bindingDescription =
-      Grr_getBindingDescription();
+  // Vertex input data binding
+  Grr_u32 bindingDescriptionCount;
+  VkVertexInputBindingDescription *bindingDescriptions =
+      Grr_getBindingDescriptions(&bindingDescriptionCount);
 
+  // Vertex input attribute descriptions
   Grr_u32 attributeDescriptionCount;
   VkVertexInputAttributeDescription *attributeDescriptions =
       Grr_getAtributeDescriptions(&attributeDescriptionCount);
+
+  // Vertex input create info
   VkPipelineVertexInputStateCreateInfo vertexInputInfo = {0};
   vertexInputInfo.sType =
       VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-  vertexInputInfo.vertexBindingDescriptionCount = 1;
-  vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+  vertexInputInfo.vertexBindingDescriptionCount = bindingDescriptionCount;
+  vertexInputInfo.pVertexBindingDescriptions =
+      bindingDescriptions; // TODO: free where ?
   vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptionCount;
   vertexInputInfo.pVertexAttributeDescriptions =
-      attributeDescriptions; // TODO: free when ?
+      attributeDescriptions; // TODO: free where ?
 
   // Input assembly
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {0};
@@ -890,7 +895,7 @@ Grr_bool _Grr_createGraphicsPipeline() {
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // TODO: change?
   rasterizer.depthBiasEnable = VK_FALSE;
   rasterizer.depthBiasConstantFactor = 0.0f; // Optional
   rasterizer.depthBiasClamp = 0.0f;          // Optional
@@ -1296,7 +1301,9 @@ Grr_bool _Grr_recordCommandBuffer(VkCommandBuffer commandBuffer,
 
   VkBuffer vertexBuffers[] = {vertexBuffer};
   VkDeviceSize offsets[] = {0};
-  vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, &offsets[0]);
+  vkCmdBindVertexBuffers(commandBuffer, 0,
+                         sizeof(vertexBuffers[0]) / sizeof(vertexBuffers),
+                         &vertexBuffers[0], &offsets[0]);
   vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
   VkViewport viewport = {0};
@@ -1304,6 +1311,8 @@ Grr_bool _Grr_recordCommandBuffer(VkCommandBuffer commandBuffer,
   viewport.y = 0.0f;
   viewport.width = (Grr_f32)selectedExtent.width;
   viewport.height = (Grr_f32)selectedExtent.height;
+  // Min and max depth should be the same ones used for calculations by the
+  // perspective projection matrix
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
   vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -1317,7 +1326,7 @@ Grr_bool _Grr_recordCommandBuffer(VkCommandBuffer commandBuffer,
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipelineLayout, 0, 1, &descriptorSets[currentFrame],
                           0, NULL);
-  vkCmdDrawIndexed(commandBuffer, model->indexCount, 1, 0, 0, 0);
+  vkCmdDrawIndexed(commandBuffer, model.indexCount, 1, 0, 0, 0);
 
   vkCmdEndRenderPass(commandBuffer);
 
@@ -1391,9 +1400,9 @@ Grr_bool _Grr_recreateSwapchain() {
 
 void _Grr_updateUniformBuffer(Grr_u32 currentFrame) {
   GrrUniformBufferObject ubo;
-  Grr_identity(&ubo.model);
-  Grr_identity(&ubo.view);
-  Grr_identity(&ubo.projection);
+  Grr_identityMatrix(&ubo.model);
+  Grr_identityMatrix(&ubo.view);
+  Grr_identityMatrix(&ubo.projection);
   memcpy(uniformBuffersMapped[currentFrame], &ubo, sizeof(ubo));
 }
 
@@ -1737,68 +1746,93 @@ Grr_bool _Grr_createTextureSampler() {
   return true;
 }
 
+void _Grr_modelDebug(GrrModel *model) {
+  printf("Vertex count %u\n", model->vertexCount);
+  for (Grr_u32 i = 0; i < model->vertexCount * 3; i += 3) {
+    printf("%.1f %.1f %.1f\n", model->positions[i], model->positions[i + 1],
+           model->positions[i + 2]);
+  }
+
+  printf("Index count %u\n", model->indexCount);
+  for (Grr_u32 i = 0; i < model->indexCount; i++) {
+    printf("%u ", model->indices[i]);
+  }
+  printf("\n");
+}
+
 Grr_bool _Grr_createVertexBuffer() {
   // TODO: temp
-  // model->vertexCount = 4;
-  // model->vertices = (GrrVertex *)malloc(sizeof(GrrVertex) *
-  // model->vertexCount); model->vertices[0].position[0] = -0.5f;
-  // model->vertices[0].position[1] = -0.5f;
-  // model->vertices[0].position[2] = 0.5f;
-  // model->vertices[0].color[0] = 1.0f;
-  // model->vertices[0].color[1] = 0.0f;
-  // model->vertices[0].color[2] = 0.0f;
-  // model->vertices[0].color[3] = 0.0f;
-  // model->vertices[0].textureCoordinates[0] = 0.0f;
-  // model->vertices[0].textureCoordinates[1] = 0.0f;
+  // model.vertexCount = 4;
+  // model.vertices = (GrrVertex *)malloc(sizeof(GrrVertex) *
+  // model.vertexCount); model.vertices[0].position[0] = -0.5f;
+  // model.vertices[0].position[1] = -0.5f;
+  // model.vertices[0].position[2] = 0.5f;
+  // model.vertices[0].color[0] = 1.0f;
+  // model.vertices[0].color[1] = 0.0f;
+  // model.vertices[0].color[2] = 0.0f;
+  // model.vertices[0].color[3] = 0.0f;
+  // model.vertices[0].textureCoordinates[0] = 0.0f;
+  // model.vertices[0].textureCoordinates[1] = 0.0f;
 
-  // model->vertices[1].position[0] = 0.5f;
-  // model->vertices[1].position[1] = -0.5f;
-  // model->vertices[1].position[2] = 0.5f;
-  // model->vertices[1].color[0] = 0.0f;
-  // model->vertices[1].color[1] = 1.0f;
-  // model->vertices[1].color[2] = 0.0f;
-  // model->vertices[1].color[3] = 0.0f;
-  // model->vertices[1].textureCoordinates[0] = 1.0f;
-  // model->vertices[1].textureCoordinates[1] = 0.0f;
+  // model.vertices[1].position[0] = 0.5f;
+  // model.vertices[1].position[1] = -0.5f;
+  // model.vertices[1].position[2] = 0.5f;
+  // model.vertices[1].color[0] = 0.0f;
+  // model.vertices[1].color[1] = 1.0f;
+  // model.vertices[1].color[2] = 0.0f;
+  // model.vertices[1].color[3] = 0.0f;
+  // model.vertices[1].textureCoordinates[0] = 1.0f;
+  // model.vertices[1].textureCoordinates[1] = 0.0f;
 
-  // model->vertices[2].position[0] = 0.5f;
-  // model->vertices[2].position[1] = 0.5f;
-  // model->vertices[2].position[2] = 0.5f;
-  // model->vertices[2].color[0] = 0.0f;
-  // model->vertices[2].color[1] = 0.0f;
-  // model->vertices[2].color[2] = 1.0f;
-  // model->vertices[2].color[3] = 0.0f;
-  // model->vertices[2].textureCoordinates[0] = 1.0f;
-  // model->vertices[2].textureCoordinates[1] = 1.0f;
+  // model.vertices[2].position[0] = 0.5f;
+  // model.vertices[2].position[1] = 0.5f;
+  // model.vertices[2].position[2] = 0.5f;
+  // model.vertices[2].color[0] = 0.0f;
+  // model.vertices[2].color[1] = 0.0f;
+  // model.vertices[2].color[2] = 1.0f;
+  // model.vertices[2].color[3] = 0.0f;
+  // model.vertices[2].textureCoordinates[0] = 1.0f;
+  // model.vertices[2].textureCoordinates[1] = 1.0f;
 
-  // model->vertices[3].position[0] = -0.5f;
-  // model->vertices[3].position[1] = 0.5f;
-  // model->vertices[3].position[2] = 0.5f;
-  // model->vertices[3].color[0] = 1.0f;
-  // model->vertices[3].color[1] = 1.0f;
-  // model->vertices[3].color[2] = 1.0f;
-  // model->vertices[3].color[3] = 0.0f;
-  // model->vertices[3].textureCoordinates[0] = 0.0f;
-  // model->vertices[3].textureCoordinates[1] = 1.0f;
+  // model.vertices[3].position[0] = -0.5f;
+  // model.vertices[3].position[1] = 0.5f;
+  // model.vertices[3].position[2] = 0.5f;
+  // model.vertices[3].color[0] = 1.0f;
+  // model.vertices[3].color[1] = 1.0f;
+  // model.vertices[3].color[2] = 1.0f;
+  // model.vertices[3].color[3] = 0.0f;
+  // model.vertices[3].textureCoordinates[0] = 0.0f;
+  // model.vertices[3].textureCoordinates[1] = 1.0f;
 
-  // model->indexCount = 6;
-  // model->indices = (Grr_u32 *)malloc(sizeof(Grr_u32) * model->indexCount);
-  // model->indices[0] = 0;
-  // model->indices[1] = 1;
-  // model->indices[2] = 2;
-  // model->indices[3] = 2;
-  // model->indices[4] = 3;
-  // model->indices[5] = 0;
+  // model.indexCount = 6;
+  // model.indices = (Grr_u32 *)malloc(sizeof(Grr_u32) * model.indexCount);
+  // model.indices[0] = 0;
+  // model.indices[1] = 1;
+  // model.indices[2] = 2;
+  // model.indices[3] = 2;
+  // model.indices[4] = 3;
+  // model.indices[5] = 0;
+
   // Test loading models here
-  GrrModel *model = Grr_glTFLoad("../glTF-Sample-Models/2.0/DamagedHelmet/"
-                                 "glTF/DamagedHelmet.gltf");
-  if (NULL == model) {
-    GRR_LOG_CRITICAL("Failed to load glTF model\n");
+  GrrAssetglTF *glTF = Grr_glTFLoad("../glTF-Sample-Models/2.0/DamagedHelmet/"
+                                    "glTF/DamagedHelmet.gltf");
+  if (NULL == glTF) {
+    GRR_LOG_CRITICAL("Failed to load glTF asset\n");
     exit(EXIT_FAILURE);
   }
   // Grr_writeJSONToFile(json, "output.json");
-
-  VkDeviceSize bufferSize = sizeof(GrrVertex) * model->vertexCount;
+  Grr_modelFromAsset(&model, glTF, 0, 0);
+  _Grr_modelDebug(&model);
+  VkDeviceSize positionBufferSize =
+      (model.positions ? sizeof(Grr_f32) * 3 * model.vertexCount
+                       : 0); // Positions
+  // VkDeviceSize colorBufferSize =
+  //     (model.colors ? sizeof(Grr_f32) * 3 * model.vertexCount : 0); // Colors
+  // VkDeviceSize textureCoordinateBufferSize =
+  //     (model.textureCoordinates ? sizeof(Grr_f32) * 2 * model.vertexCount
+  //                               : 0); // Texture coordinates
+  VkDeviceSize bufferSize =
+      positionBufferSize; // + colorBufferSize + textureCoordinateBufferSize;
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
   if (_Grr_createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1811,7 +1845,15 @@ Grr_bool _Grr_createVertexBuffer() {
 
   void *data;
   vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-  memcpy(data, model->vertices, (size_t)bufferSize);
+  if (NULL != model.positions)
+    memcpy(data, model.positions, (size_t)positionBufferSize); // Positions
+  // if (NULL != model.colors)
+  //   memcpy(data + positionBufferSize, model.colors,
+  //          (size_t)colorBufferSize); // Colors
+  // if (NULL != model.textureCoordinates)
+  //   memcpy(data + positionBufferSize + colorBufferSize,
+  //          model.textureCoordinates,
+  //          (size_t)textureCoordinateBufferSize); // Texture coordinates
   vkUnmapMemory(device, stagingBufferMemory);
 
   if (_Grr_createBuffer(bufferSize,
@@ -1978,7 +2020,7 @@ Grr_bool _Grr_createDescriptorSets() {
 }
 
 Grr_bool _Grr_createIndexBuffer() {
-  VkDeviceSize bufferSize = sizeof(Grr_u32) * model->indexCount;
+  VkDeviceSize bufferSize = sizeof(Grr_u32) * model.indexCount;
 
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingBufferMemory;
@@ -1992,7 +2034,7 @@ Grr_bool _Grr_createIndexBuffer() {
 
   void *data;
   vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-  memcpy(data, model->indices, (size_t)bufferSize);
+  memcpy(data, model.indices, (size_t)bufferSize);
   vkUnmapMemory(device, stagingBufferMemory);
 
   if (_Grr_createBuffer(bufferSize,

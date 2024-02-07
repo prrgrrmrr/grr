@@ -1,16 +1,34 @@
 #include "assets.h"
 
-VkVertexInputBindingDescription Grr_getBindingDescription() {
-  VkVertexInputBindingDescription bindingDescription = {0};
-  bindingDescription.binding = 0;
-  bindingDescription.stride = sizeof(GrrVertex);
-  bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-  return bindingDescription;
+VkVertexInputBindingDescription *
+Grr_getBindingDescriptions(Grr_u32 *bindingDescriptionCount) {
+  *bindingDescriptionCount = 1; // Update if necessary
+
+  VkVertexInputBindingDescription *bindingDescriptions =
+      (VkVertexInputBindingDescription *)malloc(
+          sizeof(VkVertexInputBindingDescription) * (*bindingDescriptionCount));
+
+  // Positions
+  bindingDescriptions[0].binding = 0;
+  bindingDescriptions[0].stride = sizeof(Grr_f32) * 3;
+  bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  // // Colors
+  // bindingDescriptions[1].binding = 1;
+  // bindingDescriptions[1].stride = sizeof(Grr_f32) * 3;
+  // bindingDescriptions[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  // // Texture coordinates
+  // bindingDescriptions[2].binding = 2;
+  // bindingDescriptions[2].stride = sizeof(Grr_f32) * 2;
+  // bindingDescriptions[2].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  return bindingDescriptions;
 }
 
 VkVertexInputAttributeDescription *
 Grr_getAtributeDescriptions(Grr_u32 *attributeDescriptionCount) {
-  *attributeDescriptionCount = 3; // Update if necessary
+  *attributeDescriptionCount = 1; // Update if necessary
 
   VkVertexInputAttributeDescription *attributeDescriptions =
       (VkVertexInputAttributeDescription *)malloc(
@@ -21,20 +39,23 @@ Grr_getAtributeDescriptions(Grr_u32 *attributeDescriptionCount) {
     return NULL;
   }
 
+  // Positions
   attributeDescriptions[0].binding = 0;
   attributeDescriptions[0].location = 0;
   attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-  attributeDescriptions[0].offset = offsetof(GrrVertex, position);
+  attributeDescriptions[0].offset = 0;
 
-  attributeDescriptions[1].binding = 0;
-  attributeDescriptions[1].location = 1;
-  attributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributeDescriptions[1].offset = offsetof(GrrVertex, color);
+  // // Colors
+  // attributeDescriptions[1].binding = 1;
+  // attributeDescriptions[1].location = 1;
+  // attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+  // attributeDescriptions[1].offset = 0;
 
-  attributeDescriptions[2].binding = 0;
-  attributeDescriptions[2].location = 2;
-  attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-  attributeDescriptions[2].offset = offsetof(GrrVertex, textureCoordinates);
+  // // Texture coordinates
+  // attributeDescriptions[2].binding = 2;
+  // attributeDescriptions[2].location = 2;
+  // attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+  // attributeDescriptions[2].offset = 0;
 
   return attributeDescriptions;
 }
@@ -583,9 +604,227 @@ void _Grr_endJSONLiteral(GrrList *stack, GrrList *objStack, Grr_byte value) {
   }
 }
 
-GrrModel *_Grr_modelFromJSON(const GrrHashMap *json) { return NULL; }
+GrrAssetglTF *_Grr_glTFFromJSON(GrrHashMap *json, Grr_string assetDir) {
+  GrrAssetglTF *glTF = (GrrAssetglTF *)malloc(sizeof(GrrAssetglTF));
+  if (NULL == glTF) {
+    GRR_LOG_ERROR("glTF: failed to allocate memory for GrrAsset\n");
+    return NULL;
+  }
 
-GrrModel *Grr_glTFLoad(const Grr_string path) {
+  GrrType type;
+  GrrHashMapValue *buffersList = Grr_hashMapGet(json, "buffers", &type);
+  assert(type == LIST);
+  glTF->buffers =
+      (Grr_byte **)malloc(sizeof(Grr_byte *) * buffersList->list->count);
+  if (NULL == glTF->buffers) {
+    GRR_LOG_ERROR("glTF: failed to allocate memory for buffer list\n");
+    return NULL;
+  }
+
+  GrrHashMapValue *value;
+  size_t nBytes;
+
+  // Prep path
+  size_t lenAssetDir = strlen(assetDir);
+  size_t lenURI;
+  Grr_string uri;
+  char pathURI[256];
+  memcpy(pathURI, assetDir, lenAssetDir);
+
+  // Load buffer binary data
+  for (Grr_u32 i = 0; i < buffersList->list->count; i++) {
+    value = Grr_listGetAtIndex(buffersList->list, i, &type);
+    assert(type == HASH_MAP);
+    assert(Grr_hashMapGet(value->map, "byteLength", NULL) != NULL);
+    assert(Grr_hashMapGet(value->map, "uri", NULL) != NULL);
+    uri = Grr_hashMapGet(value->map, "uri", NULL)->string;
+
+    GRR_LOG_DEBUG("URI %s%s\n", assetDir,
+                  Grr_hashMapGet(value->map, "uri", NULL)->string);
+    lenURI = strlen(uri);
+    if (lenURI >= 4 && (0 == strncmp("data:", pathURI, 5))) {
+      // TODO: Data URI https://www.rfc-editor.org/rfc/pdfrfc/rfc2397.txt.pdf
+      GRR_LOG_CRITICAL("glTF: parsing of data URIs not implemented\n");
+      return NULL;
+    } else {
+      // Relative path
+      // TODO: Relative paths — path-noscheme or ipath-noscheme as defined by
+      // RFC 3986, Section 4.2 or RFC 3987, Section 2.2 — without scheme,
+      // authority, or parameters. Reserved characters (as defined by RFC 3986,
+      // Section 2.2. and RFC 3987, Section 2.2.) MUST be percent-encoded.
+      memcpy(pathURI + lenAssetDir, uri, lenURI);
+      pathURI[lenAssetDir + lenURI] = '\0';
+      glTF->buffers[i] = Grr_readBytesFromFile(pathURI, &nBytes);
+      assert(nBytes == Grr_hashMapGet(value->map, "byteLength", NULL)->i64);
+      GRR_LOG_DEBUG("glTF: read buffer bytes (%llu)\n", nBytes);
+    }
+  }
+
+  // Buffer views
+  GrrHashMapValue *bufferViewList = Grr_hashMapGet(json, "bufferViews", &type);
+  glTF->bufferViews = (GrrBufferView *)malloc(sizeof(GrrBufferView) *
+                                              bufferViewList->list->count);
+  if (NULL != glTF->bufferViews) {
+    for (Grr_u32 i = 0; i < bufferViewList->list->count; i++) {
+      value = Grr_listGetAtIndex(bufferViewList->list, i, &type);
+      assert(type == HASH_MAP);
+      glTF->bufferViews[i].bufferIndex =
+          Grr_hashMapGet(value->map, "buffer", NULL)->i64;
+      glTF->bufferViews[i].nBytes =
+          Grr_hashMapGet(value->map, "byteLength", NULL)->i64;
+      GrrHashMapValue *offsetValue =
+          Grr_hashMapGet(value->map, "byteOffset", NULL);
+      glTF->bufferViews[i].offset = (offsetValue ? offsetValue->i64 : 0);
+      GrrHashMapValue *strideValue =
+          Grr_hashMapGet(value->map, "byteStride", NULL);
+      glTF->bufferViews[i].stride = (strideValue ? strideValue->i64 : -1);
+      GrrHashMapValue *targetValue = Grr_hashMapGet(value->map, "target", NULL);
+      if (targetValue)
+        glTF->bufferViews[i].target = targetValue->i64;
+    }
+  } else {
+    GRR_LOG_ERROR("glTF: failed to allocate memory for buffer views\n");
+  }
+
+  // Accessors
+  // An accessor defines a method for retrieving data as typed arrays from
+  // within a buffer view. The accessor specifies a component type (e.g., float)
+  // and a data type (e.g., VEC3 for 3D vectors), which when combined define the
+  // complete data type for each data element
+  GrrHashMapValue *accessorList = Grr_hashMapGet(json, "accessors", &type);
+  glTF->accessors =
+      (GrrAccessor *)malloc(sizeof(GrrAccessor) * accessorList->list->count);
+  if (NULL != glTF->accessors) {
+    Grr_string elementTypeString;
+    for (Grr_u32 i = 0; i < accessorList->list->count; i++) {
+      value = Grr_listGetAtIndex(accessorList->list, i, &type);
+      assert(type == HASH_MAP);
+      // Buffer view index
+      GrrHashMapValue *bufferView =
+          Grr_hashMapGet(value->map, "bufferView", NULL);
+      glTF->accessors[i].bufferViewIndex = (bufferView ? bufferView->i64 : -1);
+      // Offset within buffer
+      GrrHashMapValue *offset = Grr_hashMapGet(value->map, "byteOffset", NULL);
+      glTF->accessors[i].byteOffset = (offset ? offset->i64 : 0);
+      // Element count
+      glTF->accessors[i].count = Grr_hashMapGet(value->map, "count", NULL)->i64;
+      // Parse element type
+      elementTypeString = Grr_hashMapGet(value->map, "type", NULL)->string;
+      if (0 == strcmp(elementTypeString, "SCALAR"))
+        glTF->accessors[i].type = ELEMENT_TYPE_SCALAR;
+      else if (0 == strcmp(elementTypeString, "VEC2"))
+        glTF->accessors[i].type = ELEMENT_TYPE_VEC2;
+      else if (0 == strcmp(elementTypeString, "VEC3"))
+        glTF->accessors[i].type = ELEMENT_TYPE_VEC3;
+      else if (0 == strcmp(elementTypeString, "VEC4"))
+        glTF->accessors[i].type = ELEMENT_TYPE_VEC4;
+      else if (0 == strcmp(elementTypeString, "MAT2"))
+        glTF->accessors[i].type = ELEMENT_TYPE_MAT2X2;
+      else if (0 == strcmp(elementTypeString, "MAT3"))
+        glTF->accessors[i].type = ELEMENT_TYPE_MAT3X3;
+      else if (0 == strcmp(elementTypeString, "MAT4"))
+        glTF->accessors[i].type = ELEMENT_TYPE_MAT4X4;
+      // Component type
+      glTF->accessors[i].componentType =
+          Grr_hashMapGet(value->map, "componentType", NULL)->i64;
+      // Handle sparse accessor
+      GrrHashMapValue *sparse = Grr_hashMapGet(value->map, "sparse", NULL);
+      if (NULL != sparse) {
+        GRR_LOG_WARNING("Sparse");
+        glTF->accessors[i].sparseAccessor =
+            (GrrSparseAccessor *)malloc(sizeof(GrrSparseAccessor));
+        if (NULL != glTF->accessors[i].sparseAccessor) {
+          // Required properties
+          glTF->accessors[i].sparseAccessor->count =
+              Grr_hashMapGet(sparse->map, "count", NULL)->i64;
+          GrrHashMap *indicesObj =
+              Grr_hashMapGet(sparse->map, "indices", NULL)->map;
+          GrrHashMap *valuesObj =
+              Grr_hashMapGet(sparse->map, "values", NULL)->map;
+
+          // Sub-properties
+          // Indices
+          GrrHashMapValue *tmpValue;
+          tmpValue = Grr_hashMapGet(indicesObj, "bufferView", NULL);
+          glTF->accessors[i].sparseAccessor->indicesBufferViewIndex =
+              tmpValue->i64;
+          tmpValue = Grr_hashMapGet(indicesObj, "byteOffset", NULL);
+          glTF->accessors[i].sparseAccessor->indicesByteOffset =
+              (tmpValue ? tmpValue->i64 : 0);
+          glTF->accessors[i].sparseAccessor->indicesComponentType =
+              Grr_hashMapGet(indicesObj, "componentType", NULL)->i64;
+
+          // Values
+          tmpValue = Grr_hashMapGet(valuesObj, "bufferView", NULL);
+          glTF->accessors[i].sparseAccessor->valuesBufferViewIndex =
+              tmpValue->i64;
+          tmpValue = Grr_hashMapGet(indicesObj, "byteOffset", NULL);
+          glTF->accessors[i].sparseAccessor->valuesByteOffset =
+              (tmpValue ? tmpValue->i64 : 0);
+        } else {
+          GRR_LOG_ERROR("glTF: failed to allocate memory for sparse accessor "
+                        "properties\n");
+        }
+      } else {
+        glTF->accessors[i].sparseAccessor = NULL;
+      }
+    }
+  } else {
+    GRR_LOG_ERROR("glTF: failed to allocate memory for accessors\n");
+  }
+
+  // List of meshes
+  GrrHashMapValue *meshList = Grr_hashMapGet(json, "meshes", &type);
+  glTF->meshes = (GrrMesh *)malloc(sizeof(GrrMesh) * meshList->list->count);
+  if (NULL != glTF->meshes) {
+    for (Grr_u32 i = 0; i < meshList->list->count; i++) {
+      value = Grr_listGetAtIndex(meshList->list, i, &type);
+      assert(type == HASH_MAP);
+      value = Grr_hashMapGet(value->map, "primitives",
+                             &type); // Reuse value here (ignoring mesh name)
+      assert(type == LIST);
+      glTF->meshes[i].primitiveCount = value->list->count;
+      glTF->meshes[i].primitives = (GrrMeshPrimitive *)malloc(
+          sizeof(GrrMeshPrimitive) * value->list->count);
+      if (NULL != glTF->meshes[i].primitives) {
+        for (Grr_u32 j = 0; j < value->list->count; j++) {
+          GrrHashMap *primitiveObj =
+              Grr_listGetAtIndex(value->list, j, NULL)->map;
+          GrrHashMap *attributesObj =
+              Grr_hashMapGet(primitiveObj, "attributes", NULL)->map;
+          GrrHashMapValue *attribute =
+              Grr_hashMapGet(attributesObj, "POSITION", NULL);
+          glTF->meshes[i].primitives[j].verticesAccessorIndex =
+              (attribute ? attribute->i64 : -1);
+          // TODO: other attributes
+          // Indexed primitive
+          GrrHashMapValue *indicesValue =
+              Grr_hashMapGet(primitiveObj, "indices", NULL);
+          glTF->meshes[i].primitives[j].indicesAccessorIndex =
+              (indicesValue ? indicesValue->i64 : -1);
+          // TODO: material, mode
+        }
+      } else {
+        GRR_LOG_ERROR("glTF: failed to allocate memory for mesh primitives\n");
+      }
+    }
+  } else {
+    GRR_LOG_ERROR("glTF: failed to allocate memory for meshes\n");
+  }
+
+  // Default scene
+  value = Grr_hashMapGet(json, "scene", &type);
+  if (NULL != value)
+    glTF->scene = value->i64;
+  else
+    glTF->scene = 0; // Pick first scene if none specified
+
+  // TODO: List of scenes
+
+  return glTF;
+}
+
+GrrAssetglTF *Grr_glTFLoad(const Grr_string path) {
   // Load file as binary
   size_t nBytes;
   Grr_byte *bytes = Grr_readBytesFromFile(path, &nBytes);
@@ -603,8 +842,8 @@ GrrModel *Grr_glTFLoad(const Grr_string path) {
   Grr_bool fullyASCII = true; // Byte array consists of ASCII characters only
   Grr_bool jsonOk = true;     // JSON parses correctly
 
-  // Detect presence of byte order mark at beginning of file, ignore if present
-  // instead of reporting error
+  // Detect presence of byte order mark at beginning of file, ignore if
+  // present instead of reporting error
   if (nBytes >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
     GRR_LOG_WARNING("BOM character present at beginning of file\n");
     i += 2;
@@ -909,8 +1148,8 @@ GrrModel *Grr_glTFLoad(const Grr_string path) {
           // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
-          GRR_LOG_ERROR(
-              "JSON is not valid: expected true literal or string\n"); // Error
+          GRR_LOG_ERROR("JSON is not valid: expected true literal or "
+                        "string\n"); // Error
           jsonOk = false;
         }
         break;
@@ -923,8 +1162,8 @@ GrrModel *Grr_glTFLoad(const Grr_string path) {
           // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
-          GRR_LOG_ERROR(
-              "JSON is not valid: expected true literal or string\n"); // Error
+          GRR_LOG_ERROR("JSON is not valid: expected true literal or "
+                        "string\n"); // Error
           jsonOk = false;
         }
         break;
@@ -1009,8 +1248,8 @@ GrrModel *Grr_glTFLoad(const Grr_string path) {
           // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
-          GRR_LOG_ERROR(
-              "JSON is not valid: expected false literal or string\n"); // Error
+          GRR_LOG_ERROR("JSON is not valid: expected false literal or "
+                        "string\n"); // Error
           jsonOk = false;
         }
         break;
@@ -1044,8 +1283,8 @@ GrrModel *Grr_glTFLoad(const Grr_string path) {
           // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
-          GRR_LOG_ERROR(
-              "JSON is not valid: expected false literal or string\n"); // Error
+          GRR_LOG_ERROR("JSON is not valid: expected false literal or "
+                        "string\n"); // Error
           jsonOk = false;
         }
         break;
@@ -1063,8 +1302,8 @@ GrrModel *Grr_glTFLoad(const Grr_string path) {
           // Inside string
           _Grr_updateJSONString(codePoint);
         } else {
-          GRR_LOG_ERROR(
-              "JSON is not valid: expected null literal or string\n"); // Error
+          GRR_LOG_ERROR("JSON is not valid: expected null literal or "
+                        "string\n"); // Error
           jsonOk = false;
         }
         break;
@@ -1229,9 +1468,104 @@ GrrModel *Grr_glTFLoad(const Grr_string path) {
 
   if (utf8Ok && jsonOk) {
     // Use json hashmap to construct model
-    GrrModel *model = _Grr_modelFromJSON(json);
-    Grr_freeHashMap(json); // Frees JSON recursively
-    return model;
+    Grr_string assetDir = Grr_dirFromFilePath(path);
+    GRR_LOG_DEBUG("Asset dir %s\n", assetDir);
+    GrrAssetglTF *glTF = _Grr_glTFFromJSON(json, assetDir);
+    if (assetDir)
+      free(assetDir);
+    // Grr_freeHashMap(json); // Frees JSON recursively
+    return glTF;
   }
   return NULL;
+}
+
+Grr_byte
+Grr_bytesPerglTFComponentType(GRR_ACCESSOR_COMPONENT_TYPE componentType) {
+  switch (componentType) {
+  case COMPONENT_TYPE_SIGNED_BYTE:
+  case COMPONENT_TYPE_UNSIGNED_BYTE:
+    return 1;
+  case COMPONENT_TYPE_SIGNED_SHORT:
+  case COMPONENT_TYPE_UNSIGNED_SHORT:
+    return 2;
+  case COMPONENT_TYPE_UNSIGNED_INT:
+  case COMPONENT_TYPE_FLOAT:
+    return 3;
+  default:
+    GRR_LOG_ERROR("Unknown glTF component type %u\n", componentType);
+    return 0;
+  }
+}
+
+void Grr_modelFromAsset(GrrModel *model, GrrAssetglTF *gltf, Grr_u32 meshIndex,
+                        Grr_u32 primitiveIndex) {
+  GrrMesh *mesh = &gltf->meshes[meshIndex];
+  GrrMeshPrimitive *primitive = &mesh->primitives[primitiveIndex];
+
+  // TODO: what if vertex data is not tightly packed ?
+
+  // Vertices
+  GrrAccessor verticesAccessor =
+      gltf->accessors[primitive->verticesAccessorIndex];
+  if (NULL == verticesAccessor.sparseAccessor) {
+    model->vertexCount = verticesAccessor.count;
+    GrrBufferView bufferView =
+        gltf->bufferViews[verticesAccessor.bufferViewIndex];
+    model->positions =
+        (Grr_f32 *)(gltf->buffers[bufferView.bufferIndex] +
+                    verticesAccessor.byteOffset + bufferView.offset);
+    model->colors = NULL;             // TODO
+    model->textureCoordinates = NULL; // TODO
+  } else {
+    // TODO: handle sparse accessor
+    GRR_LOG_CRITICAL("Sparse accessors not supported!");
+    exit(EXIT_FAILURE);
+  }
+
+  // Indices
+  if (primitive->indicesAccessorIndex == -1) {
+    // Not indexed TODO
+    // When indices property is not defined, attribute accessors' count
+    // indicates the number of vertices to render
+  } else {
+    // Indexed
+    // When indices property is defined, the number of vertex indices to render
+    // is defined by count of accessor referred to by indices
+    GrrAccessor indicesAccessor =
+        gltf->accessors[primitive->indicesAccessorIndex];
+    if (NULL == indicesAccessor.sparseAccessor) {
+      model->indexCount = indicesAccessor.count;
+      GrrBufferView bufferView =
+          gltf->bufferViews[indicesAccessor.bufferViewIndex];
+      if (indicesAccessor.componentType == COMPONENT_TYPE_UNSIGNED_INT) {
+        model->indices =
+            (Grr_u32 *)(gltf->buffers[bufferView.bufferIndex] +
+                        indicesAccessor.byteOffset + bufferView.offset);
+      } else {
+        // Convert to COMPONENT_TYPE_UNSIGNED_INT
+        model->indices = (Grr_u32 *)malloc(
+            sizeof(Grr_u32) * model->indexCount); // TODO: where to free ?
+        size_t bytesPerIndex =
+            Grr_bytesPerglTFComponentType(indicesAccessor.componentType);
+        if (bytesPerIndex == 1) {
+          Grr_byte *indices = gltf->buffers[bufferView.bufferIndex] +
+                              indicesAccessor.byteOffset + bufferView.offset;
+          for (Grr_u32 i = 0; i < model->indexCount; i++) {
+            model->indices[i] = (Grr_u32)indices[i];
+          }
+        } else if (bytesPerIndex == 2) {
+          Grr_u16 *indices =
+              (Grr_u16 *)(gltf->buffers[bufferView.bufferIndex] +
+                          indicesAccessor.byteOffset + bufferView.offset);
+          for (Grr_u32 i = 0; i < model->indexCount; i++) {
+            model->indices[i] = (Grr_u32)indices[i];
+          }
+        }
+      }
+    } else {
+      // TODO: handle sparse accessor
+      GRR_LOG_CRITICAL("Sparse accessors not supported!");
+      exit(EXIT_FAILURE);
+    }
+  }
 }

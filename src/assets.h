@@ -68,25 +68,113 @@
 // - All angles are in radians.
 // - Positive rotation is counterclockwise.
 
-typedef struct GrrVertex {
-  Grr_f32 position[3];
-  Grr_f32 color[4];
-  Grr_f32 textureCoordinates[2];
-} GrrVertex;
-
-VkVertexInputBindingDescription Grr_getBindingDescription();
+VkVertexInputBindingDescription *
+Grr_getBindingDescriptions(Grr_u32 *bindingDescriptionCount);
 VkVertexInputAttributeDescription *
 Grr_getAtributeDescriptions(Grr_u32 *attributeDescriptionCount);
 
 typedef struct GrrModel {
-  GrrVertex *vertices;
+  // Vertex data
   Grr_u32 vertexCount;
-  Grr_u32 *indices;
+  Grr_f32 *positions;          // Vertex XYZ
+  Grr_f32 *colors;             // Vertex RGB
+  Grr_f32 *textureCoordinates; // Vertex UV
+
+  // Index data
   Grr_u32 indexCount;
+  Grr_u32 *indices; // Vertex indices
 } GrrModel;
 
+typedef struct GrrBufferView {
+  Grr_u32 bufferIndex;
+  Grr_u32 nBytes;
+  Grr_u32 offset;
+  Grr_i32 stride; // -1 if not defined
+  Grr_u16 target;
+} GrrBufferView;
+
+typedef enum GRR_ACCESSOR_COMPONENT_TYPE {
+  COMPONENT_TYPE_SIGNED_BYTE = 5120,    // 8 bits
+  COMPONENT_TYPE_UNSIGNED_BYTE = 5121,  // 8 bits
+  COMPONENT_TYPE_SIGNED_SHORT = 5122,   // 16 bits
+  COMPONENT_TYPE_UNSIGNED_SHORT = 5123, // 16 bits
+  COMPONENT_TYPE_UNSIGNED_INT = 5125,   // 32 bits
+  COMPONENT_TYPE_FLOAT = 5126,          // 32 bits (signed)
+} GRR_ACCESSOR_COMPONENT_TYPE;
+
+Grr_byte
+Grr_bytesPerglTFComponentType(GRR_ACCESSOR_COMPONENT_TYPE componentType);
+
+typedef enum GRR_ACCESSOR_ELEMENT_TYPE {
+  ELEMENT_TYPE_SCALAR,
+  ELEMENT_TYPE_VEC2,
+  ELEMENT_TYPE_VEC3,
+  ELEMENT_TYPE_VEC4,
+  ELEMENT_TYPE_MAT2X2,
+  ELEMENT_TYPE_MAT3X3,
+  ELEMENT_TYPE_MAT4X4
+} GRR_ACCESSOR_ELEMENT_TYPE;
+
+typedef struct GrrSparseAccessor {
+  Grr_u32 count; //  Number of displaced elements
+  // Indices: location and the component type of indices of values to be
+  // replaced
+  Grr_u32 indicesBufferViewIndex;
+  Grr_u32 indicesByteOffset;
+  GRR_ACCESSOR_COMPONENT_TYPE indicesComponentType;
+  // Values: location of new values to put in the indices previously described
+  Grr_u32 valuesBufferViewIndex;
+  Grr_u32 valuesByteOffset;
+} GrrSparseAccessor;
+
+typedef struct GrrAccessor {
+  Grr_i32 bufferViewIndex; // signed because -1 is error flag
+  Grr_u32 byteOffset;      // Start in buffer view pointed to by vufferViewIndex
+  Grr_u32 count;           // Element count
+  GRR_ACCESSOR_ELEMENT_TYPE
+  type; // Element type: "SCALAR" (1 component) "VEC2" (2 components)
+        // "VEC3" (3 components) "VEC4" (4 components) "MAT2" (4
+        // components) "MAT3" (9 components) "MAT4" (16 components)
+  GRR_ACCESSOR_COMPONENT_TYPE
+  componentType; // Component type in element
+  GrrSparseAccessor
+      *sparseAccessor; // Populated if accessor is sparse
+                       // When accessor.bufferView is undefined,
+                       // the sparse accessor is initialized as an array of
+                       // zeros of size (size of the accessor element) *
+                       // (accessor.count) bytes
+} GrrAccessor;
+
+typedef struct GrrMeshPrimitive {
+  Grr_i32 verticesAccessorIndex; // POSITION
+  Grr_i32 normalsAccessorIndex;  // NORMAL
+  Grr_i32 tangentsAccessorIndex; // TANGNET
+  // TODO: TEXCOORD_n, COLOR_n, JOINTS_n, WEIGHTS_n
+  Grr_i32
+      indicesAccessorIndex; // For indexed primitives: useful for cutting number
+                            // of vertices to render by reusing their indices
+  // TODO: material, mode
+} GrrMeshPrimitive;
+
+typedef struct GrrMesh {
+  Grr_u32 primitiveCount; // Count of primitives that make up this mesh
+  GrrMeshPrimitive *primitives;
+} GrrMesh;
+
 // glTF
-GrrModel *Grr_glTFLoad(const Grr_string path);
+typedef struct GrrAssetglTF {
+  Grr_byte **buffers;         // Array of data buffers
+  GrrBufferView *bufferViews; // Buffer views
+  GrrAccessor *accessors;     // Buffer view accessors
+  GrrMesh *meshes;            // List of meshes
+  Grr_u32 scene;              // Default scene
+} GrrAssetglTF;
+
+GrrAssetglTF *Grr_glTFLoad(const Grr_string path);
+// TODO: Grr_freeglTF(GrrAssetglTF *glTF);
+
+void Grr_modelFromAsset(GrrModel *model, GrrAssetglTF *gltf, Grr_u32 meshIndex,
+                        Grr_u32 primitiveIndex);
 
 // Images
 Grr_byte *Grr_loadPNG(const Grr_string path, Grr_u32 *nReadbytes, Grr_u32 *w,
